@@ -45,3 +45,8 @@ export interface Article {
   heroImage: string;
   content: ContentBlock[];
 }
+
+export interface Subscriber {
+  email: string;
+  subscribedAt: string;
+}

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Article, ContentBlock } from '../types';
+import type { Article, Subscriber } from '../types';
 import { BlockType } from '../types';
 
 const initialArticles: Article[] = [
@@ -55,6 +55,7 @@ const initialArticles: Article[] = [
 
 export const useMockData = () => {
   const [articles, setArticles] = useState<Article[]>(initialArticles);
+  const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
 
   const getArticle = useCallback(
     (id: string) => {
@@ -79,5 +80,19 @@ export const useMockData = () => {
     setArticles(prev => prev.filter(article => article.id !== articleId));
   }, []);
 
-  return { articles, getArticle, updateArticle, addArticle, deleteArticle };
+  const addSubscriber = useCallback((email: string) => {
+    const newSubscriber: Subscriber = {
+      email,
+      subscribedAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    };
+    // Prevent duplicates
+    setSubscribers(prev => {
+        if (prev.find(s => s.email === email)) {
+            return prev;
+        }
+        return [...prev, newSubscriber];
+    });
+  }, []);
+
+  return { articles, getArticle, updateArticle, addArticle, deleteArticle, subscribers, addSubscriber };
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, createContext } from 'react';
 import { HashRouter, Routes, Route, Link, useParams, useNavigate } from 'react-router-dom';
 import { useMockData } from './hooks/useMockData';
-import type { Article, ContentBlock } from './types';
+import type { Article, ContentBlock, Subscriber } from './types';
 import { BlockType } from './types';
 import { EmailCapture } from './components/EmailCapture';
 import { ArticleEditor } from './components/ArticleEditor';
@@ -93,7 +93,7 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => (
 
 // --- Pages ---
 
-const HomePage: React.FC<{ articles: Article[] }> = ({ articles }) => (
+const HomePage: React.FC<{ articles: Article[], onSubscribe: (email: string) => void }> = ({ articles, onSubscribe }) => (
     <>
         <PublicHeader />
         <main className="max-w-4xl mx-auto px-4 mt-12">
@@ -104,7 +104,7 @@ const HomePage: React.FC<{ articles: Article[] }> = ({ articles }) => (
             </div>
         </main>
         <PublicFooter />
-        <EmailCapture />
+        <EmailCapture onSubscribe={onSubscribe} />
     </>
 );
 
@@ -204,7 +204,7 @@ const AdminLoginPage: React.FC = () => {
     );
 };
 
-const AdminDashboard: React.FC<{ articles: Article[], deleteArticle: (id: string) => void }> = ({ articles, deleteArticle }) => {
+const AdminDashboard: React.FC<{ articles: Article[], deleteArticle: (id: string) => void, subscribers: Subscriber[] }> = ({ articles, deleteArticle, subscribers }) => {
     const { logout } = useAuth();
     const navigate = useNavigate();
 
@@ -217,6 +217,26 @@ const AdminDashboard: React.FC<{ articles: Article[], deleteArticle: (id: string
       if (window.confirm(`Are you sure you want to delete "${articleTitle}"? This action cannot be undone.`)) {
         deleteArticle(articleId);
       }
+    };
+
+    const handleDownloadCsv = () => {
+        if (subscribers.length === 0) {
+            alert('No subscribers to download.');
+            return;
+        }
+        const csvHeader = 'email,subscribedAt\n';
+        const csvRows = subscribers.map(s => `"${s.email}","${s.subscribedAt}"`).join('\n');
+        const csvContent = csvHeader + csvRows;
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'grind-stories-subscribers.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     return (
@@ -244,6 +264,27 @@ const AdminDashboard: React.FC<{ articles: Article[], deleteArticle: (id: string
                             </li>
                         ))}
                     </ul>
+                </div>
+
+                <div className="mt-12">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-2xl font-serif">Subscribers ({subscribers.length})</h2>
+                        <button onClick={handleDownloadCsv} className="bg-stone-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-stone-700 transition-colors text-sm">Download CSV</button>
+                    </div>
+                    <div className="bg-white border border-stone-200 rounded-lg shadow-sm">
+                        {subscribers.length > 0 ? (
+                            <ul>
+                                {subscribers.map((subscriber, index) => (
+                                    <li key={index} className={`flex justify-between items-center p-4 ${index < subscribers.length - 1 ? 'border-b border-stone-200' : ''}`}>
+                                        <span className="text-charcoal">{subscriber.email}</span>
+                                        <span className="text-sm text-stone-500">Subscribed on: {subscriber.subscribedAt}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="p-4 text-stone-500">No subscribers yet.</p>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
@@ -283,14 +324,14 @@ const EditorPage: React.FC<{ getArticle: (id: string) => Article | undefined; on
 // --- Main App Structure ---
 
 function AppContent() {
-    const { articles, getArticle, updateArticle, addArticle, deleteArticle } = useMockData();
+    const { articles, getArticle, updateArticle, addArticle, deleteArticle, subscribers, addSubscriber } = useMockData();
     
     return (
         <Routes>
-            <Route path="/" element={<HomePage articles={articles} />} />
+            <Route path="/" element={<HomePage articles={articles} onSubscribe={addSubscriber} />} />
             <Route path="/article/:id" element={<ArticlePage getArticle={getArticle} />} />
             <Route path="/admin" element={<AdminLoginPage />} />
-            <Route path="/dashboard" element={<ProtectedRoute><AdminDashboard articles={articles} deleteArticle={deleteArticle} /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><AdminDashboard articles={articles} deleteArticle={deleteArticle} subscribers={subscribers} /></ProtectedRoute>} />
             <Route path="/editor/new" element={<ProtectedRoute><EditorPage getArticle={getArticle} onSave={updateArticle} onAdd={addArticle}/></ProtectedRoute>} />
             <Route path="/editor/:id" element={<ProtectedRoute><EditorPage getArticle={getArticle} onSave={updateArticle} onAdd={addArticle}/></ProtectedRoute>} />
         </Routes>

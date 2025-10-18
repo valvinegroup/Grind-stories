@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-export const EmailCapture: React.FC = () => {
+interface EmailCaptureProps {
+    onSubscribe: (email: string) => void;
+}
+
+export const EmailCapture: React.FC<EmailCaptureProps> = ({ onSubscribe }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
@@ -14,6 +18,11 @@ export const EmailCapture: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+    if (email) {
+        onSubscribe(email);
+    }
     setIsSubmitted(true);
     setTimeout(() => {
         setIsVisible(false);
@@ -38,6 +47,7 @@ export const EmailCapture: React.FC = () => {
                 <form onSubmit={handleSubmit}>
                     <input
                         type="email"
+                        name="email"
                         placeholder="your.email@address.com"
                         required
                         className="w-full px-3 py-2 border border-stone-300 rounded-md text-sm placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-gold"
