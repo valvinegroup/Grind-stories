@@ -148,7 +148,6 @@ const deserializeArticle = (article: DbArticleRow, blocks: DbContentBlockRow[]):
   title: article.title ?? '',
   subtitle: article.subtitle ?? '',
   author: article.author ?? '',
-  publishDate: article.publishdate ?? '',
   publishDate: article.publish_date ?? '',
   heroImage: article.hero_image ?? '',
   content: blocks
