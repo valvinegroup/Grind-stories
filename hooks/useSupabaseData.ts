@@ -96,20 +96,9 @@ const serializeContentBlocks = (articleId: string, blocks: ContentBlock[]) =>
           logo_src: block.logoSrc || null,
           link: block.link || null,
         };
-      default:
-        return {
-          id: block.id,
-          article_id: articleId,
-          block_order: index,
-          type: block.type,
-          content: null,
-          src: null,
-          caption: null,
-          title: null,
-          company: null,
-          logo_src: null,
-          link: null,
-        };
+      default: {
+        throw new Error('Unsupported block type encountered while serializing content blocks.');
+      }
     }
   });
 
