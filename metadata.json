@@ -1,7 +1,0 @@
-{
-  "name": "Grind Stories",
-  "description": "An aesthetic newsletter platform for stories of ambition and perseverance. Users can read articles, and an admin can create rich, modular content.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}

@@ -1,12 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 
 export const generateText = async (prompt: string): Promise<string> => {
-  if (!process.env.API_KEY) {
-    console.warn("API_KEY environment variable not set. Gemini API calls will fail.");
+  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    console.warn("GEMINI_API_KEY environment variable not set. Gemini API calls will fail.");
     return "Error: API key not configured.";
   }
   
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const response = await ai.models.generateContent({

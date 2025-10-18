@@ -1,7 +1,9 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 
 interface EmailCaptureProps {
-    onSubscribe: (email: string) => void;
+    onSubscribe: (subscriber: { name: string; email: string }) => void;
 }
 
 export const EmailCapture: React.FC<EmailCaptureProps> = ({ onSubscribe }) => {
@@ -11,7 +13,7 @@ export const EmailCapture: React.FC<EmailCaptureProps> = ({ onSubscribe }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsVisible(true);
-    }, 5000); // Show after 5 seconds
+    }, 5000);
 
     return () => clearTimeout(timer);
   }, []);
@@ -19,9 +21,10 @@ export const EmailCapture: React.FC<EmailCaptureProps> = ({ onSubscribe }) => {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
-    if (email) {
-        onSubscribe(email);
+    const name = (formData.get('name') as string)?.trim();
+    const email = (formData.get('email') as string)?.trim();
+    if (name && email) {
+        onSubscribe({ name, email });
     }
     setIsSubmitted(true);
     setTimeout(() => {
@@ -46,6 +49,13 @@ export const EmailCapture: React.FC<EmailCaptureProps> = ({ onSubscribe }) => {
                 <p className="text-stone-600 text-sm mb-4">Receive new articles directly to your inbox. Curated thoughts, delivered monthly.</p>
                 <form onSubmit={handleSubmit}>
                     <input
+                        type="text"
+                        name="name"
+                        placeholder="Your name"
+                        required
+                        className="w-full px-3 py-2 border border-stone-300 rounded-md text-sm placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-gold mb-3"
+                    />
+                    <input
                         type="email"
                         name="email"
                         placeholder="your.email@address.com"
@@ -58,7 +68,7 @@ export const EmailCapture: React.FC<EmailCaptureProps> = ({ onSubscribe }) => {
                 </form>
             </>
         )}
-        <style>{`
+        <style jsx>{`
           @keyframes slide-in {
             from { transform: translateY(1rem); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
