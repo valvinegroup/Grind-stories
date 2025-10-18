@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import type { Article, Subscriber, ContentBlock } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -49,7 +50,8 @@ export const useSupabaseData = () => {
   const fetchSubscribers = useCallback(async () => {
     const { data, error } = await supabase
       .from('subscribers')
-      .select('email, subscribed_at as subscribedAt')
+      // FIX: Corrected Supabase select syntax for column aliasing.
+      .select('email, subscribedAt:subscribed_at')
       .order('subscribed_at', { ascending: false });
     if (error) console.error('Error fetching subscribers', error);
     else setSubscribers(data as Subscriber[]);
@@ -115,7 +117,8 @@ export const useSupabaseData = () => {
   }, [fetchArticles]);
 
   const addSubscriber = useCallback(async (email: string) => {
-    const { error } = await supabase.from('subscribers').insert({ email }, { onConflict: 'email' });
+    // FIX: Replaced deprecated .insert with onConflict with the .upsert method for handling duplicate entries.
+    const { error } = await supabase.from('subscribers').upsert({ email }, { onConflict: 'email' });
     if(error) console.error('Error adding subscriber', error);
     else await fetchSubscribers();
   }, [fetchSubscribers]);
