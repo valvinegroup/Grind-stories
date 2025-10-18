@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import type { Article, ContentBlock } from '../types';
 import { BlockType } from '../types';
@@ -76,5 +75,9 @@ export const useMockData = () => {
       setArticles(prev => [newArticle, ...prev]);
   }, []);
 
-  return { articles, getArticle, updateArticle, addArticle };
+  const deleteArticle = useCallback((articleId: string) => {
+    setArticles(prev => prev.filter(article => article.id !== articleId));
+  }, []);
+
+  return { articles, getArticle, updateArticle, addArticle, deleteArticle };
 };

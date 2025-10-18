@@ -204,7 +204,7 @@ const AdminLoginPage: React.FC = () => {
     );
 };
 
-const AdminDashboard: React.FC<{ articles: Article[] }> = ({ articles }) => {
+const AdminDashboard: React.FC<{ articles: Article[], deleteArticle: (id: string) => void }> = ({ articles, deleteArticle }) => {
     const { logout } = useAuth();
     const navigate = useNavigate();
 
@@ -212,6 +212,12 @@ const AdminDashboard: React.FC<{ articles: Article[] }> = ({ articles }) => {
         logout();
         navigate('/admin');
     }
+    
+    const handleDeleteClick = (articleId: string, articleTitle: string) => {
+      if (window.confirm(`Are you sure you want to delete "${articleTitle}"? This action cannot be undone.`)) {
+        deleteArticle(articleId);
+      }
+    };
 
     return (
         <div className="p-8">
@@ -231,7 +237,10 @@ const AdminDashboard: React.FC<{ articles: Article[] }> = ({ articles }) => {
                                     <h3 className="font-semibold text-charcoal">{article.title}</h3>
                                     <p className="text-sm text-stone-500">{article.publishDate}</p>
                                 </div>
-                                <Link to={`/editor/${article.id}`} className="text-sm font-semibold text-gold hover:underline">Edit</Link>
+                                <div className="flex items-center space-x-4">
+                                  <Link to={`/editor/${article.id}`} className="text-sm font-semibold text-gold hover:underline">Edit</Link>
+                                  <button onClick={() => handleDeleteClick(article.id, article.title)} className="text-sm font-semibold text-red-600 hover:underline">Delete</button>
+                                </div>
                             </li>
                         ))}
                     </ul>
@@ -274,16 +283,16 @@ const EditorPage: React.FC<{ getArticle: (id: string) => Article | undefined; on
 // --- Main App Structure ---
 
 function AppContent() {
-    const { articles, getArticle, updateArticle, addArticle } = useMockData();
+    const { articles, getArticle, updateArticle, addArticle, deleteArticle } = useMockData();
     
     return (
         <Routes>
             <Route path="/" element={<HomePage articles={articles} />} />
             <Route path="/article/:id" element={<ArticlePage getArticle={getArticle} />} />
             <Route path="/admin" element={<AdminLoginPage />} />
-            <Route path="/dashboard" element={<ProtectedRoute><AdminDashboard articles={articles} /></ProtectedRoute>} />
-            <Route path="/editor/:id" element={<ProtectedRoute><EditorPage getArticle={getArticle} onSave={updateArticle} onAdd={addArticle}/></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><AdminDashboard articles={articles} deleteArticle={deleteArticle} /></ProtectedRoute>} />
             <Route path="/editor/new" element={<ProtectedRoute><EditorPage getArticle={getArticle} onSave={updateArticle} onAdd={addArticle}/></ProtectedRoute>} />
+            <Route path="/editor/:id" element={<ProtectedRoute><EditorPage getArticle={getArticle} onSave={updateArticle} onAdd={addArticle}/></ProtectedRoute>} />
         </Routes>
     );
 }
