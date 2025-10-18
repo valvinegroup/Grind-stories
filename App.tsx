@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, createContext } from 'react';
 import { HashRouter, Routes, Route, Link, useParams, useNavigate } from 'react-router-dom';
-import { useMockData } from './hooks/useMockData';
+import { useSupabaseData } from './hooks/useSupabaseData';
 import type { Article, ContentBlock, Subscriber } from './types';
 import { BlockType } from './types';
 import { EmailCapture } from './components/EmailCapture';
@@ -204,7 +204,7 @@ const AdminLoginPage: React.FC = () => {
     );
 };
 
-const AdminDashboard: React.FC<{ articles: Article[], deleteArticle: (id: string) => void, subscribers: Subscriber[] }> = ({ articles, deleteArticle, subscribers }) => {
+const AdminDashboard: React.FC<{ articles: Article[], deleteArticle: (id: string) => Promise<void>, subscribers: Subscriber[] }> = ({ articles, deleteArticle, subscribers }) => {
     const { logout } = useAuth();
     const navigate = useNavigate();
 
@@ -291,13 +291,13 @@ const AdminDashboard: React.FC<{ articles: Article[], deleteArticle: (id: string
     );
 };
 
-const EditorPage: React.FC<{ getArticle: (id: string) => Article | undefined; onSave: (article: Article) => void; onAdd: (article: Article) => void; }> = ({ getArticle, onSave, onAdd }) => {
+const EditorPage: React.FC<{ getArticle: (id: string) => Article | undefined; onSave: (article: Article) => Promise<void>; onAdd: (article: Article) => Promise<void>; }> = ({ getArticle, onSave, onAdd }) => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const article = id ? getArticle(id) : null;
     
     const newArticleTemplate: Article = {
-        id: `new-article-${Date.now()}`,
+        id: `grind-article-${Date.now()}`,
         title: '',
         subtitle: '',
         author: 'A. Vanderbilt',
@@ -308,11 +308,11 @@ const EditorPage: React.FC<{ getArticle: (id: string) => Article | undefined; on
     
     const articleToEdit = article || newArticleTemplate;
 
-    const handleSave = (updatedArticle: Article) => {
+    const handleSave = async (updatedArticle: Article) => {
         if(id && id !== 'new') {
-            onSave(updatedArticle);
+            await onSave(updatedArticle);
         } else {
-            onAdd({...updatedArticle, id: `article-${Date.now()}`});
+            await onAdd({...updatedArticle, id: `grind-article-${Date.now()}`});
         }
         navigate('/dashboard');
     };
@@ -324,8 +324,12 @@ const EditorPage: React.FC<{ getArticle: (id: string) => Article | undefined; on
 // --- Main App Structure ---
 
 function AppContent() {
-    const { articles, getArticle, updateArticle, addArticle, deleteArticle, subscribers, addSubscriber } = useMockData();
+    const { articles, getArticle, updateArticle, addArticle, deleteArticle, subscribers, addSubscriber, loading } = useSupabaseData();
     
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center font-serif text-xl text-stone-500">Loading Stories...</div>
+    }
+
     return (
         <Routes>
             <Route path="/" element={<HomePage articles={articles} onSubscribe={addSubscriber} />} />
