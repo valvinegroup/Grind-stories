@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../../lib/auth-context';
 import { useSupabaseData } from '../../hooks/useSupabaseData';
+import type { Subscriber } from '../../lib/types';
 
 export default function AdminDashboard() {
     const { isAuthenticated, logout } = useAuth();
     const router = useRouter();
-    const { articles, deleteArticle, subscribers, loading } = useSupabaseData();
+    const { articles, deleteArticle, subscribers, deleteSubscriber, loading } = useSupabaseData();
 
     useEffect(() => {
         if (!isAuthenticated) {
@@ -46,6 +47,12 @@ export default function AdminDashboard() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    };
+
+    const handleSubscriberDelete = (subscriber: Subscriber) => {
+        if (window.confirm(`Remove ${subscriber.email} from the list?`)) {
+            deleteSubscriber(subscriber);
+        }
     };
 
     if (!isAuthenticated || loading) {
@@ -88,12 +95,20 @@ export default function AdminDashboard() {
                         {subscribers.length > 0 ? (
                             <ul>
                                 {subscribers.map((subscriber, index) => (
-                                    <li key={index} className={`flex justify-between items-center p-4 ${index < subscribers.length - 1 ? 'border-b border-stone-200' : ''}`}>
+                                    <li key={subscriber.id || index} className={`flex justify-between items-center p-4 ${index < subscribers.length - 1 ? 'border-b border-stone-200' : ''}`}>
                                         <div>
                                             <p className="font-semibold text-charcoal">{subscriber.name || 'Unnamed subscriber'}</p>
                                             <p className="text-sm text-stone-500">{subscriber.email}</p>
                                         </div>
-                                        <span className="text-sm text-stone-500">Subscribed on: {subscriber.subscribedAt}</span>
+                                        <div className="flex items-center space-x-4">
+                                            <span className="text-sm text-stone-500">Subscribed on: {subscriber.subscribedAt}</span>
+                                            <button
+                                                onClick={() => handleSubscriberDelete(subscriber)}
+                                                className="text-sm font-semibold text-red-600 hover:underline"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>

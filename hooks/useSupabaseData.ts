@@ -28,6 +28,24 @@ type DbContentBlockRow = {
   block_order: number;
 };
 
+type PostgrestErrorLike = {
+  code?: string;
+  message?: string;
+  details?: string;
+} | null;
+
+const isMissingNameColumnError = (error: PostgrestErrorLike) => {
+  if (!error) return false;
+  const code = error.code ?? '';
+  if (code === '42703' || code === 'PGRST204' || code === 'PGRST205') return true;
+  const combined = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+  return (
+    combined.includes("the 'name' column") ||
+    combined.includes('column "name"') ||
+    combined.includes("column 'name'")
+  );
+};
+
 const serializeArticle = (article: Article) => ({
   id: article.id,
   title: article.title,
@@ -96,20 +114,9 @@ const serializeContentBlocks = (articleId: string, blocks: ContentBlock[]) =>
           logo_src: block.logoSrc || null,
           link: block.link || null,
         };
-      default:
-        return {
-          id: block.id,
-          article_id: articleId,
-          block_order: index,
-          type: block.type,
-          content: null,
-          src: null,
-          caption: null,
-          title: null,
-          company: null,
-          logo_src: null,
-          link: null,
-        };
+      default: {
+        throw new Error('Unsupported block type encountered while serializing content blocks.');
+      }
     }
   });
 
@@ -196,25 +203,24 @@ export const useSupabaseData = () => {
   const fetchSubscribers = useCallback(async () => {
     const { data, error } = await supabase
       .from('subscribers')
-      .select('name, email, subscribed_at')
+      .select('id, name, email, subscribed_at')
       .order('subscribed_at', { ascending: false });
 
     if (error) {
-      const columnMissing =
-        error.code === '42703' || error.message?.toLowerCase().includes('column "name"');
-      if (columnMissing) {
+      if (isMissingNameColumnError(error)) {
         console.warn(
           'Supabase subscribers table missing name column; falling back to email-only fetch. Run `ALTER TABLE subscribers ADD COLUMN name TEXT;` when convenient.'
         );
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('subscribers')
-          .select('email, subscribed_at')
+          .select('id, email, subscribed_at')
           .order('subscribed_at', { ascending: false });
         if (fallbackError) {
-          console.error('Error fetching subscribers (fallback failed)', fallbackError);
+          console.error('Error fetching subscribers (fallback failed)', JSON.stringify(fallbackError, null, 2));
           return;
         }
         const formattedFallback = (fallbackData ?? []).map((sub) => ({
+          id: sub.id ?? sub.email,
           name: '',
           email: sub.email,
           subscribedAt: sub.subscribed_at,
@@ -222,11 +228,12 @@ export const useSupabaseData = () => {
         setSubscribers(formattedFallback);
         return;
       }
-      console.error('Error fetching subscribers', error);
+      console.error('Error fetching subscribers', JSON.stringify(error, null, 2));
       return;
     }
 
     const formattedData = (data ?? []).map((sub) => ({
+      id: sub.id ?? sub.email,
       name: sub.name ?? '',
       email: sub.email,
       subscribedAt: sub.subscribed_at,
@@ -303,19 +310,17 @@ export const useSupabaseData = () => {
       const payload = { name: name || null, email };
       const { error } = await supabase.from('subscribers').upsert(payload, { onConflict: 'email' });
       if (error) {
-        const columnMissing =
-          error.code === '42703' || error.message?.toLowerCase().includes('column "name"');
-        if (columnMissing) {
+        if (isMissingNameColumnError(error)) {
           console.warn(
             'Supabase subscribers table missing name column. Falling back to email-only insert. Run `ALTER TABLE subscribers ADD COLUMN name TEXT;` when convenient.'
           );
           const fallback = await supabase.from('subscribers').upsert({ email }, { onConflict: 'email' });
           if (fallback.error) {
-            console.error('Error adding subscriber (fallback failed)', fallback.error);
+            console.error('Error adding subscriber (fallback failed)', JSON.stringify(fallback.error, null, 2));
             return;
           }
         } else {
-          console.error('Error adding subscriber', error);
+          console.error('Error adding subscriber', JSON.stringify(error, null, 2));
           return;
         }
       }
@@ -324,5 +329,39 @@ export const useSupabaseData = () => {
     [fetchSubscribers]
   );
 
-  return { articles, getArticle, updateArticle, addArticle, deleteArticle, subscribers, addSubscriber, loading };
+  const deleteSubscriber = useCallback(
+    async (subscriber: Subscriber) => {
+      const primaryColumn = subscriber.id && subscriber.id !== subscriber.email ? 'id' : 'email';
+      const primaryValue = primaryColumn === 'id' ? subscriber.id : subscriber.email;
+
+      const { error } = await supabase.from('subscribers').delete().eq(primaryColumn, primaryValue);
+      if (error) {
+        if (primaryColumn === 'id') {
+          const fallback = await supabase.from('subscribers').delete().eq('email', subscriber.email);
+          if (fallback.error) {
+            console.error('Error deleting subscriber (fallback failed)', JSON.stringify(fallback.error, null, 2));
+            return;
+          }
+        } else {
+          console.error('Error deleting subscriber', JSON.stringify(error, null, 2));
+          return;
+        }
+      }
+
+      await fetchSubscribers();
+    },
+    [fetchSubscribers]
+  );
+
+  return {
+    articles,
+    getArticle,
+    updateArticle,
+    addArticle,
+    deleteArticle,
+    subscribers,
+    addSubscriber,
+    deleteSubscriber,
+    loading,
+  };
 };
