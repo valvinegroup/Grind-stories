@@ -47,6 +47,7 @@ export interface Article {
 }
 
 export interface Subscriber {
+  name: string;
   email: string;
   subscribedAt: string;
 }

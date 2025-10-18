@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { Article, ContentBlock } from '../types';
-import { BlockType } from '../types';
+'use client';
+
+import React, { useState } from 'react';
+import type { Article, ContentBlock } from '../lib/types';
+import { BlockType } from '../lib/types';
 import { AudioRecorder } from './AudioRecorder';
 import { BoldIcon, ItalicIcon, H2Icon, ImageIcon, MicIcon, DollarSignIcon, TextIcon, TrashIcon, SparklesIcon } from './icons';
-import { generateText } from '../services/geminiService';
+import { generateText } from '../lib/gemini';
 
 interface ArticleEditorProps {
     article: Article;
@@ -34,7 +36,6 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
         setArticle(prev => ({ ...prev, [name]: value }));
     };
 
-    // FIX: Added type assertion to fix type inference issue with spread operator on a discriminated union.
     const handleContentChange = (id: string, newContent: Partial<ContentBlock>) => {
         setArticle(prev => ({
             ...prev,
@@ -44,7 +45,6 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
         }));
     };
 
-    // FIX: Replaced conditional spreading with a switch statement to ensure type safety for new blocks.
     const addBlock = (type: BlockType) => {
         let newBlock: ContentBlock;
         const id = Date.now().toString();
@@ -63,7 +63,6 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
                 newBlock = { id, type, company: '', logoSrc: '', link: '' };
                 break;
             default:
-                // This should not be reached if all block types are handled
                 return;
         }
 
@@ -77,7 +76,6 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
         }));
     };
     
-    // Drag and Drop handlers
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
         setDragging(id);
         e.dataTransfer.effectAllowed = 'move';
@@ -104,9 +102,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
         setDragging(null);
     };
 
-    // Text Editor Toolbar
     const TextEditorToolbar: React.FC<{ blockId: string }> = ({ blockId }) => {
-        // FIX: Updated execCmd to accept an optional value argument for commands that require it.
         const execCmd = (cmd: string, value?: string) => document.execCommand(cmd, false, value);
         
         const openAiModal = () => {
@@ -269,7 +265,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
                 </div>
 
             </div>
-            <div className="h-16"></div> {/* Spacer for bottom */}
+            <div className="h-16"></div>
         </div>
     );
 };
