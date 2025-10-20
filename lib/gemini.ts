@@ -1,4 +1,4 @@
-﻿import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 export const generateText = async (prompt: string): Promise<string> => {
   const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;

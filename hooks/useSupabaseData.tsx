@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, createContext, useContext } from 'react';
+import type { ReactNode } from 'react';
 import type { Article, Subscriber, ContentBlock } from '../lib/types';
 import { BlockType } from '../lib/types';
 import { supabase } from '../lib/supabase';
@@ -33,6 +34,20 @@ type PostgrestErrorLike = {
   message?: string;
   details?: string;
 } | null;
+
+type SupabaseDataContextValue = {
+  articles: Article[];
+  getArticle: (id: string) => Article | undefined;
+  updateArticle: (updatedArticle: Article) => Promise<void>;
+  addArticle: (newArticle: Article) => Promise<void>;
+  deleteArticle: (articleId: string) => Promise<void>;
+  subscribers: Subscriber[];
+  addSubscriber: (subscriber: { name: string; email: string }) => Promise<void>;
+  deleteSubscriber: (subscriber: Subscriber) => Promise<void>;
+  loading: boolean;
+};
+
+const SupabaseDataContext = createContext<SupabaseDataContextValue | null>(null);
 
 const isMissingNameColumnError = (error: PostgrestErrorLike) => {
   if (!error) return false;
@@ -156,13 +171,12 @@ const deserializeArticle = (article: DbArticleRow, blocks: DbContentBlockRow[]):
     .filter((block): block is ContentBlock => block !== null),
 });
 
-export const useSupabaseData = () => {
+const useSupabaseDataInternal = (): SupabaseDataContextValue => {
   const [articles, setArticles] = useState<Article[]>([]);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchArticles = useCallback(async () => {
-    setLoading(true);
     const { data: articlesData, error: articlesError } = await supabase
       .from('articles')
       .select('*')
@@ -196,7 +210,6 @@ export const useSupabaseData = () => {
     );
 
     setArticles(assembledArticles);
-    setLoading(false);
   }, []);
   
   const fetchSubscribers = useCallback(async () => {
@@ -241,8 +254,14 @@ export const useSupabaseData = () => {
   }, []);
 
   useEffect(() => {
-    fetchArticles();
-    fetchSubscribers();
+    let isMounted = true;
+    (async () => {
+      await Promise.all([fetchArticles(), fetchSubscribers()]);
+      if (isMounted) setLoading(false);
+    })();
+    return () => {
+      isMounted = false;
+    };
   }, [fetchArticles, fetchSubscribers]);
 
   const getArticle = useCallback(
@@ -352,15 +371,31 @@ export const useSupabaseData = () => {
     [fetchSubscribers]
   );
 
-  return {
-    articles,
-    getArticle,
-    updateArticle,
-    addArticle,
-    deleteArticle,
-    subscribers,
-    addSubscriber,
-    deleteSubscriber,
-    loading,
-  };
+  return useMemo(
+    () => ({
+      articles,
+      getArticle,
+      updateArticle,
+      addArticle,
+      deleteArticle,
+      subscribers,
+      addSubscriber,
+      deleteSubscriber,
+      loading,
+    }),
+    [articles, getArticle, updateArticle, addArticle, deleteArticle, subscribers, addSubscriber, deleteSubscriber, loading]
+  );
+};
+
+export const SupabaseDataProvider = ({ children }: { children: ReactNode }) => {
+  const value = useSupabaseDataInternal();
+  return <SupabaseDataContext.Provider value={value}>{children}</SupabaseDataContext.Provider>;
+};
+
+export const useSupabaseData = () => {
+  const context = useContext(SupabaseDataContext);
+  if (!context) {
+    throw new Error('useSupabaseData must be used within a SupabaseDataProvider');
+  }
+  return context;
 };

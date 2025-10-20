@@ -41,6 +41,10 @@ export default function ArticlePage() {
         );
     }
 
+    const metaPieces = [article.publishDate, article.author].filter(
+        (piece): piece is string => typeof piece === 'string' && piece.trim().length > 0
+    );
+
     const renderBlock = (block: ContentBlock) => {
         switch (block.type) {
             case BlockType.TEXT:
@@ -102,7 +106,9 @@ export default function ArticlePage() {
                     <header className="text-center mb-12">
                         <h1 className="text-4xl md:text-5xl font-serif font-bold text-charcoal leading-tight">{article.title}</h1>
                         <p className="text-xl text-stone-600 mt-4">{article.subtitle}</p>
-                        <p className="text-sm text-stone-400 mt-6">{article.publishDate} &middot; {article.author}</p>
+                        {metaPieces.length > 0 && (
+                            <p className="text-sm text-stone-400 mt-6">{metaPieces.join(' \u00b7 ')}</p>
+                        )}
                     </header>
                     {article.heroImage ? (
                         <img src={article.heroImage} alt={article.title || 'Article hero image'} className="w-full h-auto object-cover rounded-lg shadow-xl mb-12" />

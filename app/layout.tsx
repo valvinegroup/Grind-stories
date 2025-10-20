@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../lib/auth-context";
+import { SupabaseDataProvider } from "../hooks/useSupabaseData";
 
 const playfair = Playfair_Display({
   variable: "--font-serif",
@@ -18,6 +19,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Grind Stories",
   description: "Stories of ambition and perseverance.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -31,7 +37,9 @@ export default function RootLayout({
         className={`${playfair.variable} ${inter.variable} bg-cream font-sans text-charcoal antialiased`}
       >
         <AuthProvider>
-          {children}
+          <SupabaseDataProvider>
+            {children}
+          </SupabaseDataProvider>
         </AuthProvider>
       </body>
     </html>

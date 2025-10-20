@@ -23,7 +23,12 @@ const PublicFooter = () => (
     </footer>
 );
 
-const ArticleCard: React.FC<{ article: Article }> = ({ article }) => (
+const ArticleCard: React.FC<{ article: Article }> = ({ article }) => {
+  const metaPieces = [article.publishDate, article.author].filter(
+    (piece): piece is string => typeof piece === 'string' && piece.trim().length > 0
+  );
+
+  return (
     <Link href={`/article/${article.id}`} className="block group">
         <div className="overflow-hidden rounded-lg bg-stone-100 flex items-center justify-center">
             {article.heroImage ? (
@@ -41,10 +46,13 @@ const ArticleCard: React.FC<{ article: Article }> = ({ article }) => (
         <div className="mt-4">
             <h2 className="text-2xl font-serif text-charcoal group-hover:text-gold transition-colors">{article.title}</h2>
             <p className="text-stone-600 mt-1">{article.subtitle}</p>
-            <p className="text-sm text-stone-400 mt-2">{article.publishDate} &middot; {article.author}</p>
+            {metaPieces.length > 0 && (
+              <p className="text-sm text-stone-400 mt-2">{metaPieces.join(' \u00b7 ')}</p>
+            )}
         </div>
     </Link>
-);
+  );
+};
 
 export default function Home() {
   const { articles, addSubscriber, loading } = useSupabaseData();
