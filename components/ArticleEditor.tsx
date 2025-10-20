@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Article, ContentBlock } from '../lib/types';
 import { BlockType } from '../lib/types';
 import { AudioRecorder } from './AudioRecorder';
@@ -22,32 +22,53 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
+const generateBlockId = () => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        try {
+            return crypto.randomUUID();
+        } catch {
+            // fall through to timestamp fallback
+        }
+    }
+    return `block-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+};
+
 export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialArticle, onSave, onClose }) => {
     const [article, setArticle] = useState<Article>(initialArticle);
+    const [isSaving, setIsSaving] = useState(false);
     const [dragging, setDragging] = useState<string | null>(null);
+    const draggingIdRef = useRef<string | null>(null);
 
     const [isAiModalOpen, setIsAiModalOpen] = useState(false);
     const [aiPrompt, setAiPrompt] = useState('');
     const [aiLoading, setAiLoading] = useState(false);
     const [activeTextBlockId, setActiveTextBlockId] = useState<string | null>(null);
 
-    const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    useEffect(() => {
+        setArticle(initialArticle);
+    }, [initialArticle]);
+
+    const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setArticle(prev => ({ ...prev, [name]: value }));
-    };
+    }, []);
 
-    const handleContentChange = (id: string, newContent: Partial<ContentBlock>) => {
-        setArticle(prev => ({
-            ...prev,
-            content: prev.content.map(block =>
-                block.id === id ? ({ ...block, ...newContent } as ContentBlock) : block
-            ),
-        }));
-    };
+    const handleContentChange = useCallback((id: string, newContent: Partial<ContentBlock>) => {
+        setArticle(prev => {
+            let didUpdate = false;
+            const updatedContent = prev.content.map(block => {
+                if (block.id !== id) return block;
+                didUpdate = true;
+                return { ...block, ...newContent } as ContentBlock;
+            });
+            if (!didUpdate) return prev;
+            return { ...prev, content: updatedContent };
+        });
+    }, []);
 
-    const addBlock = (type: BlockType) => {
+    const addBlock = useCallback((type: BlockType) => {
         let newBlock: ContentBlock;
-        const id = Date.now().toString();
+        const id = generateBlockId();
 
         switch (type) {
             case BlockType.TEXT:
@@ -67,40 +88,57 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
         }
 
         setArticle(prev => ({ ...prev, content: [...prev.content, newBlock] }));
-    };
+    }, []);
 
-    const removeBlock = (id: string) => {
-        setArticle(prev => ({
-            ...prev,
-            content: prev.content.filter(block => block.id !== id),
-        }));
-    };
+    const removeBlock = useCallback((id: string) => {
+        setArticle(prev => {
+            const updated = prev.content.filter(block => block.id !== id);
+            if (updated.length === prev.content.length) return prev;
+            return { ...prev, content: updated };
+        });
+    }, []);
     
-    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+    const handleDragStart = useCallback((e: React.DragEvent<HTMLDivElement>, id: string) => {
+        draggingIdRef.current = id;
         setDragging(id);
         e.dataTransfer.effectAllowed = 'move';
-    };
+    }, []);
 
-    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
-    };
+        e.dataTransfer.dropEffect = 'move';
+    }, []);
 
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>, dropId: string) => {
+    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>, dropId: string) => {
         e.preventDefault();
-        if (!dragging) return;
+        const draggedId = draggingIdRef.current;
+        if (!draggedId || draggedId === dropId) {
+            setDragging(null);
+            draggingIdRef.current = null;
+            return;
+        }
 
-        const originalIndex = article.content.findIndex(b => b.id === dragging);
-        const newIndex = article.content.findIndex(b => b.id === dropId);
-        
-        if (originalIndex === -1 || newIndex === -1) return;
+        setArticle(prev => {
+            const originalIndex = prev.content.findIndex(b => b.id === draggedId);
+            const newIndex = prev.content.findIndex(b => b.id === dropId);
+            
+            if (originalIndex === -1 || newIndex === -1) return prev;
 
-        const newContent = [...article.content];
-        const [removed] = newContent.splice(originalIndex, 1);
-        newContent.splice(newIndex, 0, removed);
+            const newContent = [...prev.content];
+            const [removed] = newContent.splice(originalIndex, 1);
+            newContent.splice(newIndex, 0, removed);
 
-        setArticle(prev => ({ ...prev, content: newContent }));
+            return { ...prev, content: newContent };
+        });
+
         setDragging(null);
-    };
+        draggingIdRef.current = null;
+    }, []);
+
+    const handleDragEnd = useCallback(() => {
+        setDragging(null);
+        draggingIdRef.current = null;
+    }, []);
 
     const TextEditorToolbar: React.FC<{ blockId: string }> = ({ blockId }) => {
         const execCmd = (cmd: string, value?: string) => document.execCommand(cmd, false, value);
@@ -159,6 +197,18 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
         }
     }
 
+    const contentBlocks = useMemo(() => article.content, [article.content]);
+
+    const handleSaveClick = useCallback(async () => {
+        if (isSaving) return;
+        setIsSaving(true);
+        try {
+            await onSave(article);
+        } finally {
+            setIsSaving(false);
+        }
+    }, [article, isSaving, onSave]);
+
 
     return (
         <div className="fixed inset-0 bg-cream z-40 overflow-y-auto p-4 md:p-8">
@@ -181,6 +231,36 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
                         className="w-full mt-2 text-lg text-stone-500 placeholder-stone-400 focus:outline-none resize-none"
                         rows={1}
                     />
+                    <div className="mt-6 grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label htmlFor="article-author" className="block text-sm font-medium text-stone-700 mb-1">
+                                Published By
+                            </label>
+                            <input
+                                id="article-author"
+                name="author"
+                                type="text"
+                                value={article.author}
+                                onChange={handleTitleChange}
+                                placeholder="e.g., Ada Lovelace"
+                                className="w-full border border-stone-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gold"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="article-date" className="block text-sm font-medium text-stone-700 mb-1">
+                                Publish Date
+                            </label>
+                            <input
+                                id="article-date"
+                                name="publishDate"
+                                type="text"
+                                value={article.publishDate}
+                                onChange={handleTitleChange}
+                                placeholder="e.g., October 20, 2025"
+                                className="w-full border border-stone-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gold"
+                            />
+                        </div>
+                    </div>
                      <div className="mt-4">
                         <label className="block text-sm font-medium text-stone-700 mb-1">Hero Image</label>
                         <input type="file" accept="image/*" onChange={handleHeroImageUpload} className="text-sm" />
@@ -189,16 +269,21 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
                 </div>
 
                 <div className="p-6 space-y-4">
-                    {article.content.map((block) => (
-                         <div 
-                            key={block.id} 
-                            draggable 
-                            onDragStart={(e) => handleDragStart(e, block.id)} 
+                    {contentBlocks.map((block) => (
+                        <div
+                            key={block.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, block.id)}
                             onDragOver={handleDragOver}
                             onDrop={(e) => handleDrop(e, block.id)}
-                            className={`relative p-2 border-2 border-transparent hover:border-gold/50 rounded-md transition-colors ${dragging === block.id ? 'opacity-50' : ''}`}
+                            onDragEnd={handleDragEnd}
+                            className={`group relative border border-stone-200 rounded-lg p-4 bg-white transition-shadow hover:shadow-md ${dragging === block.id ? 'ring-1 ring-gold/80' : ''}`}
                         >
-                            <button onClick={() => removeBlock(block.id)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 z-10 opacity-0 hover:opacity-100 transition-opacity">
+                            <button
+                                onClick={() => removeBlock(block.id)}
+                                className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1.5 z-10 shadow focus:outline-none focus:ring-2 focus:ring-red-200 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                                title="Remove block"
+                            >
                                 <TrashIcon className="w-3 h-3"/>
                             </button>
 
@@ -216,33 +301,63 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
                             )}
                             {block.type === BlockType.IMAGE && (
                                 <div>
-                                    <input type="file" accept="image/*" className="mb-2 text-sm" onChange={async e => {
-                                        if (e.target.files?.[0]) handleContentChange(block.id, { src: await fileToBase64(e.target.files[0])})
-                                    }}/>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="mb-2 text-sm"
+                                        onChange={async e => {
+                                            if (e.target.files?.[0]) handleContentChange(block.id, { src: await fileToBase64(e.target.files[0])});
+                                        }}
+                                    />
                                     {block.src && <img src={block.src} alt={block.caption} className="rounded-md"/>}
-                                    <input type="text" placeholder="Image caption" value={block.caption} onChange={e => handleContentChange(block.id, { caption: e.target.value })}
-                                    className="w-full mt-2 text-sm text-center italic text-stone-500 focus:outline-none" />
+                                    <input
+                                        type="text"
+                                        placeholder="Image caption"
+                                        value={block.caption}
+                                        onChange={e => handleContentChange(block.id, { caption: e.target.value })}
+                                        className="w-full mt-2 text-sm text-center italic text-stone-500 focus:outline-none"
+                                    />
                                 </div>
                             )}
                             {block.type === BlockType.AUDIO && (
-                                <div>
-                                    <input type="text" placeholder="Audio Title" value={block.title} onChange={e => handleContentChange(block.id, { title: e.target.value })}
-                                        className="w-full mb-2 font-semibold text-charcoal focus:outline-none" />
+                                <div className="space-y-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Audio Title"
+                                        value={block.title}
+                                        onChange={e => handleContentChange(block.id, { title: e.target.value })}
+                                        className="w-full font-semibold text-charcoal focus:outline-none"
+                                    />
                                     <AudioRecorder onRecordingComplete={(audioUrl) => handleContentChange(block.id, { src: audioUrl })} />
-                                    {block.src && <audio src={block.src} controls className="w-full mt-2" />}
+                                    {block.src && <audio src={block.src} controls className="w-full" />}
                                 </div>
                             )}
                              {block.type === BlockType.SPONSORSHIP && (
-                                <div className="p-4 bg-stone-50 border border-stone-200 rounded-md">
-                                    <h4 className="text-sm font-semibold text-stone-500 uppercase tracking-wider mb-3">Sponsorship Block</h4>
-                                    <input type="file" accept="image/*" className="mb-2 text-sm" onChange={async e => {
-                                        if (e.target.files?.[0]) handleContentChange(block.id, { logoSrc: await fileToBase64(e.target.files[0])})
-                                    }}/>
-                                    {block.logoSrc && <img src={block.logoSrc} alt="Sponsor Logo" className="h-16 mb-2"/>}
-                                    <input type="text" placeholder="Company Name" value={block.company} onChange={e => handleContentChange(block.id, { company: e.target.value })}
-                                        className="w-full p-1 border-b mb-2 focus:outline-none" />
-                                    <input type="text" placeholder="https://sponsor.link" value={block.link} onChange={e => handleContentChange(block.id, { link: e.target.value })}
-                                        className="w-full p-1 border-b focus:outline-none" />
+                                <div className="p-4 bg-stone-50 border border-stone-200 rounded-md space-y-3">
+                                    <h4 className="text-sm font-semibold text-stone-500 uppercase tracking-wider">Sponsorship Block</h4>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="text-sm"
+                                        onChange={async e => {
+                                            if (e.target.files?.[0]) handleContentChange(block.id, { logoSrc: await fileToBase64(e.target.files[0])});
+                                        }}
+                                    />
+                                    {block.logoSrc && <img src={block.logoSrc} alt="Sponsor Logo" className="h-16 mb-2 object-contain"/>}
+                                    <input
+                                        type="text"
+                                        placeholder="Company Name"
+                                        value={block.company}
+                                        onChange={e => handleContentChange(block.id, { company: e.target.value })}
+                                        className="w-full p-1 border-b focus:outline-none"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="https://sponsor.link"
+                                        value={block.link}
+                                        onChange={e => handleContentChange(block.id, { link: e.target.value })}
+                                        className="w-full p-1 border-b focus:outline-none"
+                                    />
                                 </div>
                             )}
 
@@ -250,17 +365,24 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({ article: initialAr
                     ))}
                 </div>
                 
-                 <div className="p-6 border-t border-stone-200 flex items-center justify-between">
-                     <div className="flex items-center space-x-2">
+                 <div className="p-6 border-t border-stone-200 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-semibold text-stone-600 mr-2">Add Block:</span>
                         <button onClick={() => addBlock(BlockType.TEXT)} className="p-2 bg-stone-100 hover:bg-stone-200 rounded-md" title="Add Text"><TextIcon className="w-5 h-5"/></button>
                         <button onClick={() => addBlock(BlockType.IMAGE)} className="p-2 bg-stone-100 hover:bg-stone-200 rounded-md" title="Add Image"><ImageIcon className="w-5 h-5"/></button>
                         <button onClick={() => addBlock(BlockType.AUDIO)} className="p-2 bg-stone-100 hover:bg-stone-200 rounded-md" title="Add Audio"><MicIcon className="w-5 h-5"/></button>
                         <button onClick={() => addBlock(BlockType.SPONSORSHIP)} className="p-2 bg-stone-100 hover:bg-stone-200 rounded-md" title="Add Sponsorship"><DollarSignIcon className="w-5 h-5"/></button>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:space-x-2">
                          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-stone-600 bg-stone-100 rounded-md hover:bg-stone-200">Close</button>
-                         <button onClick={() => onSave(article)} className="px-6 py-2 text-sm font-semibold text-white bg-charcoal rounded-md hover:bg-stone-700">Save & Publish</button>
+                         <button
+                            onClick={handleSaveClick}
+                            disabled={isSaving}
+                            aria-busy={isSaving}
+                            className="px-6 py-2 text-sm font-semibold text-white bg-charcoal rounded-md hover:bg-stone-700 disabled:opacity-70 disabled:cursor-not-allowed"
+                         >
+                            {isSaving ? 'Saving...' : 'Save & Publish'}
+                         </button>
                     </div>
                 </div>
 

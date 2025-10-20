@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth-context';
 import { useSupabaseData } from '../../../hooks/useSupabaseData';
@@ -20,29 +20,43 @@ export default function EditorPage() {
         }
     }, [isAuthenticated, router]);
 
-    if (!isAuthenticated || loading) {
-        return <div className="min-h-screen flex items-center justify-center font-serif text-xl text-stone-500">Loading...</div>;
-    }
+    const isNewArticle = id === 'new';
 
-    const article = id !== 'new' ? getArticle(id) : null;
-    
-    const newArticleTemplate: Article = {
+    const createBlankArticle = () => ({
         id: `grind-article-${Date.now()}`,
         title: '',
         subtitle: '',
-        author: 'A. Vanderbilt',
+        author: '',
         publishDate: new Date().toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
         heroImage: '',
         content: [],
-    };
+    } as Article);
+
+    const newArticleRef = useRef<Article | null>(null);
+    if (isNewArticle) {
+        if (!newArticleRef.current) {
+            newArticleRef.current = createBlankArticle();
+        }
+    } else {
+        newArticleRef.current = null;
+    }
+
+    if (!isAuthenticated || (loading && !isNewArticle)) {
+        return <div className="min-h-screen flex items-center justify-center font-serif text-xl text-stone-500">Loading...</div>;
+    }
+
+    const article = !isNewArticle ? getArticle(id) : null;
     
-    const articleToEdit = article || newArticleTemplate;
+    const articleToEdit = article || newArticleRef.current || createBlankArticle();
 
     const handleSave = async (updatedArticle: Article) => {
-        if (id && id !== 'new') {
+        if (!isNewArticle) {
             await updateArticle(updatedArticle);
         } else {
-            await addArticle({...updatedArticle, id: `grind-article-${Date.now()}`});
+            await addArticle({
+                ...updatedArticle,
+                id: updatedArticle.id || `grind-article-${Date.now()}`,
+            });
         }
         router.push('/dashboard');
     };

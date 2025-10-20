@@ -60,24 +60,24 @@ export default function AdminDashboard() {
     }
 
     return (
-        <div className="p-8">
-            <div className="max-w-5xl mx-auto">
-                <div className="flex justify-between items-center mb-8">
+        <div className="px-4 py-6 sm:px-6 md:px-8">
+            <div className="max-w-5xl mx-auto space-y-10">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <h1 className="text-3xl font-serif">Admin Dashboard</h1>
-                    <div>
-                        <Link href="/editor/new" className="bg-charcoal text-white font-semibold py-2 px-4 rounded-md hover:bg-stone-700 transition-colors mr-4">New Article</Link>
-                        <button onClick={handleLogoutClick} className="text-sm text-stone-600 hover:underline">Logout</button>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                        <Link href="/editor/new" className="w-full sm:w-auto text-center bg-charcoal text-white font-semibold py-2 px-4 rounded-md hover:bg-stone-700 transition-colors">New Article</Link>
+                        <button onClick={handleLogoutClick} className="text-sm text-stone-600 hover:underline text-left sm:text-right">Logout</button>
                     </div>
                 </div>
                 <div className="bg-white border border-stone-200 rounded-lg shadow-sm">
                     <ul>
                         {articles.map((article, index) => (
-                            <li key={article.id} className={`flex justify-between items-center p-4 ${index < articles.length - 1 ? 'border-b border-stone-200' : ''}`}>
-                                <div>
+                            <li key={article.id} className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 ${index < articles.length - 1 ? 'border-b border-stone-200' : ''}`}>
+                                <div className="space-y-1">
                                     <h3 className="font-semibold text-charcoal">{article.title}</h3>
                                     <p className="text-sm text-stone-500">{article.publishDate}</p>
                                 </div>
-                                <div className="flex items-center space-x-4">
+                                <div className="flex flex-wrap items-center gap-3">
                                     <Link href={`/editor/${article.id}`} className="text-sm font-semibold text-gold hover:underline">Edit</Link>
                                     <button onClick={() => handleDeleteClick(article.id, article.title)} className="text-sm font-semibold text-red-600 hover:underline">Delete</button>
                                 </div>
@@ -87,20 +87,20 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="mt-12">
-                    <div className="flex justify-between items-center mb-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                         <h2 className="text-2xl font-serif">Subscribers ({subscribers.length})</h2>
-                        <button onClick={handleDownloadCsv} className="bg-stone-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-stone-700 transition-colors text-sm">Download CSV</button>
+                        <button onClick={handleDownloadCsv} className="w-full sm:w-auto bg-stone-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-stone-700 transition-colors text-sm text-center">Download CSV</button>
                     </div>
                     <div className="bg-white border border-stone-200 rounded-lg shadow-sm">
                         {subscribers.length > 0 ? (
                             <ul>
                                 {subscribers.map((subscriber, index) => (
-                                    <li key={subscriber.id || index} className={`flex justify-between items-center p-4 ${index < subscribers.length - 1 ? 'border-b border-stone-200' : ''}`}>
-                                        <div>
+                                    <li key={subscriber.id || index} className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 ${index < subscribers.length - 1 ? 'border-b border-stone-200' : ''}`}>
+                                        <div className="space-y-1">
                                             <p className="font-semibold text-charcoal">{subscriber.name || 'Unnamed subscriber'}</p>
                                             <p className="text-sm text-stone-500">{subscriber.email}</p>
                                         </div>
-                                        <div className="flex items-center space-x-4">
+                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-4">
                                             <span className="text-sm text-stone-500">Subscribed on: {subscriber.subscribedAt}</span>
                                             <button
                                                 onClick={() => handleSubscriberDelete(subscriber)}
